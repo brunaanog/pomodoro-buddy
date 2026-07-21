@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro Buddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #14171A;
+    --bg-elev: #1C2024;
+    --bg-elev-2: #23282D;
+    --text: #ECEAE4;
+    --text-dim: #9AA0A6;
+    --border: #2A2F35;
+    --work: #C98A2C;
+    --work-dim: #4A3D22;
+    --break: #3F8467;
+    --break-dim: #23372E;
+    --longbreak: #4A67C9;
+    --longbreak-dim: #232B47;
+    --danger: #D9534F;
+    --shadow: 0 12px 32px rgba(0,0,0,0.4);
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F5F1;
+    --bg-elev: #FFFFFF;
+    --bg-elev-2: #EDEBE4;
+    --text: #1B1F23;
+    --text-dim: #6B7178;
+    --border: #DEDBD2;
+    --work: #B87A20;
+    --work-dim: #F1DFC0;
+    --break: #2F6E52;
+    --break-dim: #D6E9DF;
+    --longbreak: #3B54AD;
+    --longbreak-dim: #DCE1F5;
+    --danger: #C0392B;
+    --shadow: 0 12px 32px rgba(20,20,10,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    transition: background 0.25s ease, color 0.25s ease;
+    min-height: 100vh;
+  }
+  ::selection { background: var(--work); color: var(--bg); }
+  button, input { font-family: inherit; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar nav ---------- */
+  .nav {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 28px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-brand {
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    padding: 0 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nav-brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--phase-color, var(--work)); transition: background 0.3s ease; }
+  .nav button.tab {
+    all: unset; cursor: pointer; padding: 10px 12px; border-radius: 10px;
+    font-size: 14px; font-weight: 500; color: var(--text-dim);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .nav button.tab:hover { background: var(--bg-elev); color: var(--text); }
+  .nav button.tab.active { background: var(--bg-elev-2); color: var(--text); }
+  .nav-row { display: flex; align-items: center; gap: 2px; }
+  .nav-row .tab { flex: 1; min-width: 0; }
+  .mini-toggle { position: relative; width: 26px; height: 15px; flex-shrink: 0; margin-right: 8px; }
+  .mini-toggle input { opacity: 0; width: 0; height: 0; }
+  .mini-track { position: absolute; inset: 0; background: var(--border); border-radius: 999px; cursor: pointer; transition: background 0.2s; }
+  .mini-track::after { content: ""; position: absolute; width: 11px; height: 11px; border-radius: 50%; background: var(--bg-elev); top: 2px; left: 2px; transition: transform 0.2s; }
+  .mini-toggle input:checked + .mini-track { background: var(--work); }
+  .mini-toggle input:checked + .mini-track::after { transform: translateX(11px); background: var(--bg); }
+  .nav-footer { margin-top: auto; padding: 0 12px; display: flex; flex-direction: column; gap: 10px; }
+  .theme-toggle {
+    all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-dim); padding: 6px 0;
+  }
+  .theme-toggle:hover { color: var(--text); }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 760px; }
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade 0.2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none; } }
+
+  h1.page-title { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  p.page-sub { color: var(--text-dim); font-size: 13px; margin: 0 0 28px; }
+  p.hint-sub { color: var(--text-dim); font-size: 12px; line-height: 1.6; margin: -18px 0 24px; }
+
+  /* ---------- Timer dial ---------- */
+  .timer-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .phase-pill {
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 5px 12px; border-radius: 999px; background: var(--phase-dim, var(--work-dim)); color: var(--phase-color, var(--work));
+  }
+  .dial-outer { position: relative; width: 260px; height: 260px; }
+  .dial-readout { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .dial-time {
+    font-family: 'JetBrains Mono', monospace; font-size: 42px; font-weight: 500;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    border-bottom: 1px dashed transparent; line-height: 1.1;
+  }
+  .dial-time.editable { cursor: pointer; }
+  .dial-time.editable:hover { border-bottom-color: var(--text-dim); }
+  .dial-time-input {
+    font-family: 'JetBrains Mono', monospace; font-size: 42px; font-weight: 500;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-align: center;
+    width: 150px; background: transparent; border: none; border-bottom: 1px dashed var(--work);
+    color: var(--text); outline: none; display: none;
+  }
+  .dial-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .cycle-count { font-size: 12px; color: var(--text-dim); }
+  .cycle-count b { color: var(--text); }
+
+  .controls { display: flex; gap: 10px; margin-top: 4px; }
+  .btn { all: unset; cursor: pointer; padding: 11px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; text-align: center; }
+  .btn-primary { background: var(--phase-color, var(--work)); color: var(--bg); }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg-elev-2); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* ---------- Quick settings on Timer tab ---------- */
+  .quick-settings { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; justify-content: center; }
+  .qs-field { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .qs-field label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .qs-field input {
+    width: 56px; text-align: center; background: var(--bg-elev); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 7px 4px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+
+  .notify-banner {
+    margin-top: 28px; padding: 12px 14px; background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: 10px; font-size: 12px; color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+
+  .suggestion-toast {
+    margin-top: 20px; padding: 14px 16px; border-radius: 10px; background: var(--phase-dim, var(--break-dim));
+    border: 1px solid var(--border); font-size: 13px; display: none;
+  }
+  .suggestion-toast.visible { display: block; }
+  .suggestion-toast a { color: var(--phase-color, var(--break)); }
+  .tip-card {
+    display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; padding: 12px 14px;
+    border-radius: 10px; background: var(--bg-elev); border: 1px solid var(--border); font-size: 12.5px; text-align: left;
+  }
+  .tip-icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+  .tip-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 3px; }
+  .tip-text { color: var(--text); line-height: 1.4; }
+  .tip-source { margin-top: 6px; font-size: 10.5px; color: var(--text-dim); }
+  .tip-source a { color: var(--text-dim); }
+
+  /* ---------- In-app alert toasts ---------- */
+  #toastContainer { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; max-width: 300px; }
+  .toast-card {
+    background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--work);
+    border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); font-size: 12.5px;
+    animation: toastIn 0.25s ease; transition: opacity 0.3s ease;
+  }
+  .toast-card .toast-title { font-weight: 600; margin-bottom: 2px; }
+  .toast-card .toast-body { color: var(--text-dim); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(12px);} to { opacity: 1; transform: none; } }
+
+  /* ---------- Lists (todos / reminders) ---------- */
+  .add-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .add-row input {
+    flex: 1; background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px;
+  }
+  .add-row input:focus { outline: 2px solid var(--work); outline-offset: -1px; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .list.muted { opacity: 0.45; }
+  .row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; font-size: 13px;
+  }
+  .row.done .row-label { text-decoration: line-through; color: var(--text-dim); }
+  .row-label { flex: 1; }
+  .row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--work); }
+  .icon-btn { all: unset; cursor: pointer; color: var(--text-dim); padding: 4px; border-radius: 6px; font-size: 13px; line-height: 1; }
+  .icon-btn:hover { color: var(--danger); background: var(--bg-elev-2); }
+  .icon-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+  .icon-btn:disabled:hover { color: var(--text-dim); background: none; }
+
+  /* ---------- Break ideas: tiled grid ---------- */
+  .category-grid { columns: 260px; column-gap: 14px; column-fill: balance; }
+  .category-card {
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev);
+    transition: opacity 0.2s ease, filter 0.2s ease, box-shadow 0.15s ease;
+    break-inside: avoid; margin-bottom: 14px; cursor: grab;
+  }
+  .category-card:active { cursor: grabbing; }
+  .category-card.dragging { opacity: 0.35; }
+  .category-card.drag-over { box-shadow: 0 0 0 2px var(--work) inset; }
+  .category-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .category-head .drag-handle, .category-head .icon-btn { cursor: default; }
+  .chevron { color: var(--text-dim); font-size: 11px; transition: transform 0.2s ease; flex-shrink: 0; }
+  .category-card.expanded .chevron { transform: rotate(180deg); }
+  .category-body { padding: 0 14px 14px; display: none; flex-direction: column; gap: 8px; }
+  .category-card.expanded .category-body { display: flex; }
+  .drag-handle { color: var(--text-dim); font-size: 13px; letter-spacing: -1px; flex-shrink: 0; }
+  .cat-icon { font-size: 15px; }
+  .category-head .row-label { overflow-wrap: anywhere; }
+  .sub-row { padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+  .mini-add { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .mini-add input {
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 8px; border-radius: 6px; font-size: 12px; flex: 1; min-width: 80px;
+  }
+  .info-btn {
+    all: unset; cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; color: var(--text-dim); line-height: 1;
+  }
+  .info-btn:hover { background: var(--bg-elev-2); }
+  .info-btn.has-content { color: var(--phase-color, var(--work)); }
+  .surprise-btn { margin-bottom: 16px; }
+
+  /* ---------- Notes detail modal ---------- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-card {
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; width: min(440px, 100%); box-shadow: var(--shadow);
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; margin-bottom: 12px; }
+  #modalTextarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 120px;
+  }
+  #modalTextarea:focus { outline: 2px solid var(--work); outline-offset: -1px; }
+  .modal-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+  .reminder-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .reminder-countdown {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);
+    background: var(--bg-elev-2); padding: 3px 8px; border-radius: 6px; min-width: 52px; text-align: center;
+  }
+  .reminder-minutes {
+    width: 52px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 8px; border-radius: 6px; font-size: 12px; text-align: center;
+  }
+  .reminder-minutes:disabled { opacity: 0.35; }
+  .sync-btn {
+    all: unset; cursor: pointer; font-size: 11px; color: var(--text-dim);
+    padding: 5px 9px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap;
+  }
+  .sync-btn:hover { background: var(--bg-elev-2); }
+  .sync-btn.active { color: var(--phase-color, var(--work)); border-color: var(--phase-color, var(--work)); background: var(--phase-dim, var(--work-dim)); }
+  .reminder-toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+  .reminder-toggle input { opacity: 0; width: 0; height: 0; }
+  .switch-track { position: absolute; inset: 0; background: var(--border); border-radius: 999px; cursor: pointer; transition: background 0.2s; }
+  .switch-track::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--bg-elev); top: 3px; left: 3px; transition: transform 0.2s; }
+  .reminder-toggle input:checked + .switch-track { background: var(--work); }
+  .reminder-toggle input:checked + .switch-track::after { transform: translateX(14px); background: var(--bg); }
+
+  /* ---------- Settings ---------- */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 6px; }
+  .field input[type="number"] {
+    width: 100%; background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; font-family: 'JetBrains Mono', monospace;
+  }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--border); font-size: 13px; }
+  .toggle-row:last-child { border-bottom: 1px solid var(--border); }
+  .section-title { font-size: 13px; font-weight: 600; margin: 28px 0 6px; }
+  .backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .empty { color: var(--text-dim); font-size: 13px; padding: 24px 0; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+  .limitation-note { margin-top: 32px; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  @media (max-width: 720px) {
+    .app { flex-direction: column; }
+    .nav { width: 100%; flex-direction: row; align-items: center; padding: 12px 16px; border-right: none; border-bottom: 1px solid var(--border); overflow-x: auto; }
+    .nav-brand { padding: 0 8px 0 0; }
+    .nav-footer { margin-top: 0; margin-left: auto; flex-direction: row; }
+    .main { padding: 24px 20px; max-width: none; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .category-grid { columns: 1; }
+  }
+
+  :focus-visible { outline: 2px solid var(--work); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="toastContainer"></div>
+<div class="app">
+  <nav class="nav">
+    <div class="nav-brand"><span class="dot" id="brandDot"></span>Pomodoro Buddy</div>
+    <button class="tab active" data-tab="timer">Timer</button>
+    <div class="nav-row">
+      <button class="tab" data-tab="reminders">Reminders</button>
+      <label class="mini-toggle" title="Turn all reminders on/off">
+        <input type="checkbox" id="navReminderToggle">
+        <span class="mini-track"></span>
+      </label>
+    </div>
+    <button class="tab" data-tab="todos">Break ToDos</button>
+    <button class="tab" data-tab="breaks">Break Ideas</button>
+    <button class="tab" data-tab="settings">Settings</button>
+    <div class="nav-footer">
+      <button class="theme-toggle" id="themeToggle">🌓 <span id="themeLabel">Dark</span></button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <section class="panel active" id="panel-timer">
+      <h1 class="page-title">Focus timer</h1>
+      <p class="page-sub">Click the time to type in a new value while the timer is paused.</p>
+      <div class="timer-wrap">
+        <div class="phase-pill" id="phasePill">Work</div>
+        <div class="dial-outer" id="dialOuter">
+          <svg id="dialSvg" viewBox="0 0 260 260" width="260" height="260"></svg>
+          <div class="dial-readout">
+            <div class="dial-time editable" id="dialTime">25:00</div>
+            <input class="dial-time-input" id="dialTimeInput" type="text" inputmode="numeric" autocomplete="off">
+            <div class="dial-hint" id="dialHint">tap start</div>
+          </div>
+        </div>
+        <div class="cycle-count" id="cycleCount">Cycle <b>0</b> · long break every <b>4</b></div>
+        <div class="controls">
+          <button class="btn btn-primary" id="startPauseBtn">Start</button>
+          <button class="btn btn-ghost" id="skipBtn">Skip</button>
+          <button class="btn btn-ghost" id="resetBtn">Reset</button>
+        </div>
+        <div class="quick-settings">
+          <div class="qs-field"><label for="quickWork">Work</label><input type="number" min="1" id="quickWork"></div>
+          <div class="qs-field"><label for="quickBreak">Break</label><input type="number" min="1" id="quickBreak"></div>
+          <div class="qs-field"><label for="quickLongBreak">Long break</label><input type="number" min="1" id="quickLongBreak"></div>
+          <div class="qs-field"><label for="quickLongEvery">Every</label><input type="number" min="1" id="quickLongEvery"></div>
+        </div>
+        <div class="suggestion-toast" id="suggestionToast"></div>
+        <div class="tip-card">
+          <span class="tip-icon">💡</span>
+          <div>
+            <div class="tip-label">Ergonomics tip of the day</div>
+            <div class="tip-text" id="tipText"></div>
+            <div class="tip-source">Source: <a href="https://www.osha.gov/etools/computer-workstations" target="_blank" rel="noopener">OSHA Computer Workstations eTool</a></div>
+          </div>
+        </div>
+        <div class="notify-banner" id="notifyBanner"></div>
+      </div>
+      <p class="limitation-note">This is a browser-tab app: the timer, reminders, and notifications only run while this tab is open. Keep it pinned in a background tab during work. In-app alerts (top right) and a short sound always work here, even when OS-level notifications are blocked by the browser.</p>
+    </section>
+
+    <section class="panel" id="panel-reminders">
+      <h1 class="page-title">Reminders</h1>
+      <p class="page-sub">Run independently of the pomodoro timer, on their own repeating interval, as long as this tab is open.</p>
+      <div class="toggle-row" style="border-top: none; padding-top: 0;">
+        <span>All reminders</span>
+        <label class="reminder-toggle"><input type="checkbox" id="masterReminderToggle"><span class="switch-track"></span></label>
+      </div>
+      <div class="add-row">
+        <input type="text" id="newReminderInput" placeholder="Reminder label, e.g. Refill water">
+        <button class="btn btn-ghost btn-sm" id="addReminderBtn">Add</button>
+      </div>
+      <div class="list" id="reminderList"></div>
+    </section>
+
+    <section class="panel" id="panel-todos">
+      <h1 class="page-title">Break ToDos</h1>
+      <p class="page-sub">Small tasks to knock out on a break.</p>
+      <div class="add-row">
+        <input type="text" id="newTodoInput" placeholder="Add a task">
+        <button class="btn btn-ghost btn-sm" id="addTodoBtn">Add</button>
+      </div>
+      <div class="list" id="todoList"></div>
+    </section>
+
+    <section class="panel" id="panel-breaks">
+      <h1 class="page-title">Break Ideas</h1>
+      <p class="page-sub">Activities for your breaks. Save links to workout videos, articles, or recipes inside each subcategory.</p>
+      <p class="hint-sub">As a suggestion, whether it's here, in Reminders, or a mix of both: make sure to stay hydrated, regularly check your posture, move, and rest your eyes.</p>
+      <p class="hint-sub">Just as important, pay attention to the ergonomics of your setup.</p>
+      <div class="add-row">
+        <input type="text" id="newCategoryInput" placeholder="New category, e.g. Drum practice">
+        <button class="btn btn-ghost btn-sm" id="addCategoryBtn">Add</button>
+      </div>
+      <button class="btn btn-ghost btn-sm surprise-btn" id="surpriseBtn">🎲 Surprise me</button>
+      <div class="suggestion-toast" id="breakSuggestionToast"></div>
+      <div class="category-grid" id="categoryList"></div>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <h1 class="page-title">Settings</h1>
+      <p class="page-sub">Changes apply to the next phase unless the timer is idle.</p>
+      <p class="page-sub" style="margin-top:-16px; margin-bottom: 24px;">Session lengths live on the Timer tab now — adjust them there.</p>
+      <div class="toggle-row">
+        <span>Auto-start next phase</span>
+        <label class="reminder-toggle"><input type="checkbox" id="setAutoStart"><span class="switch-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Show a break suggestion when work ends</span>
+        <label class="reminder-toggle"><input type="checkbox" id="setShowSuggestion"><span class="switch-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Play a sound on alerts</span>
+        <label class="reminder-toggle"><input type="checkbox" id="setSoundEnabled"><span class="switch-track"></span></label>
+      </div>
+
+      <h2 class="section-title">Backup</h2>
+      <p class="page-sub" style="margin-bottom: 14px;">Plain JSON — works when imported in any browser, not just this one. Save the file to Drive, Dropbox, email, a USB stick, wherever, then import it on another machine to bring everything over.</p>
+      <div class="backup-actions">
+        <button class="btn btn-ghost btn-sm" id="exportBackupBtn">Export backup</button>
+        <button class="btn btn-ghost btn-sm" id="importBackupBtn">Import backup</button>
+        <input type="file" id="importBackupInput" accept="application/json,.json" style="display:none;">
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span id="modalTitle"></span>
+      <button class="icon-btn" id="modalClose" title="Close">✕</button>
+    </div>
+    <textarea id="modalTextarea" rows="7" placeholder="Paste a link, or jot down steps or notes for this idea..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-sm" id="modalSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "pomodoroWebAppState";
+  var TWO_PI = Math.PI * 2;
+
+  var DEFAULT_CATEGORIES = [
+    { id: "physical_activity", name: "Physical Activity", isDefault: true, subcategories: [
+      { id: "posture_exercises", name: "Posture Exercises", notes: "" },
+      { id: "yoga", name: "Yoga", notes: "" },
+      { id: "walking", name: "Walking", notes: "" },
+      { id: "dancing", name: "Dancing", notes: "" }
+    ]},
+    { id: "hydration", name: "Hydration", isDefault: true, subcategories: [
+      { id: "drink_water", name: "Drink Water", notes: "" }
+    ]},
+    { id: "eye_rest", name: "Eye Rest", isDefault: true, subcategories: [
+      { id: "20_20_20", name: "20-20-20 Rule", notes: "" }
+    ]},
+    { id: "mind_reset", name: "Mind Reset", isDefault: true, subcategories: [
+      { id: "breathing", name: "Breathing", notes: "" },
+      { id: "short_walk", name: "Short Walk", notes: "" }
+    ]}
+  ];
+
+  var CATEGORY_ICONS = { physical_activity: "\uD83C\uDFC3", hydration: "\uD83D\uDCA7", eye_rest: "\uD83D\uDC41\uFE0F", mind_reset: "\uD83E\uDDD8" };
+
+  var DEFAULT_STATE = {
+    settings: {
+      workMinutes: 25,
+      breakMinutes: 5,
+      longBreakMinutes: 15,
+      longBreakEvery: 4,
+      autoStartNextSession: false,
+      showBreakSuggestion: true,
+      soundEnabled: true,
+      remindersEnabled: true,
+      darkMode: true
+    },
+    timer: { phase: "work", remainingSec: 25 * 60, totalSec: 25 * 60, isRunning: false, cycleCount: 0, phaseEndTs: null },
+    categories: DEFAULT_CATEGORIES,
+    todos: [
+      { id: "todo_laundry", text: "Laundry", done: false },
+      { id: "todo_vacuum", text: "Vacuum", done: false }
+    ],
+    reminders: [
+      { id: "rem_hydration", label: "Drink water", minutes: 30, enabled: true, lastFiredTs: null, isDefault: true },
+      { id: "rem_eye_rest", label: "Rest your eyes", minutes: 20, enabled: true, lastFiredTs: null, isDefault: true },
+      { id: "rem_posture_check", label: "Posture check", minutes: 10, enabled: true, lastFiredTs: null, isDefault: true },
+      { id: "rem_move", label: "Stand up and move", minutes: 60, enabled: true, lastFiredTs: null, isDefault: true }
+    ],
+    ui: { activeTab: "timer" },
+    meta: { wellnessDefaultsAddedV1: false, ergonomicsMovedToTipV1: false, postureIntervalV1: false, defaultChoresAddedV1: false }
+  };
+
+  function generateId(prefix) { return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function escapeHtml(str) { return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  function formatMMSS(totalSeconds) { var m = Math.floor(totalSeconds / 60), s = totalSeconds % 60; return pad2(m) + ":" + pad2(s); }
+
+  var ERGONOMIC_TIPS = [
+    "Top of your screen at or just below eye level, about an arm's length away.",
+    "Elbows close to your body at roughly 90\u00b0, wrists straight rather than bent up or down.",
+    "Feet flat on the floor or a footrest, knees roughly level with your hips.",
+    "Relax your shoulders \u2014 if they're creeping up toward your ears, drop them.",
+    "Your chair should support your lower back; avoid perching on the front edge of the seat.",
+    "Keep your mouse close enough that you're not reaching for it.",
+    "Every 20 minutes, look at something 20 feet away for 20 seconds.",
+    "Position your monitor to avoid glare from windows or overhead lights.",
+    "Avoid resting your wrists on a hard edge while typing.",
+    "Stand and stretch at least once an hour, even for 30 seconds.",
+    "Keyboard height should let your forearms sit roughly parallel to the floor.",
+    "Keep frequently used items within easy reach to avoid repeated twisting or reaching.",
+    "If you use two monitors, put the one you use most directly in front of you.",
+    "Alternate positions through the day if you can \u2014 sitting, standing, walking calls."
+  ];
+  function tipIndexForToday() {
+    var d = new Date();
+    var startOfYear = new Date(d.getFullYear(), 0, 0);
+    var dayOfYear = Math.floor((d - startOfYear) / 86400000);
+    return dayOfYear % ERGONOMIC_TIPS.length;
+  }
+  function renderTipOfDay() {
+    var el = document.getElementById("tipText");
+    if (el) el.textContent = ERGONOMIC_TIPS[tipIndexForToday()];
+  }
+
+  function mergeDefaults(current, defaults) {
+    if (Array.isArray(defaults)) return Array.isArray(current) ? current : defaults;
+    if (typeof defaults !== "object" || defaults === null) return current === undefined ? defaults : current;
+    var merged = Object.assign({}, defaults, current || {});
+    Object.keys(defaults).forEach(function (key) { merged[key] = mergeDefaults(current ? current[key] : undefined, defaults[key]); });
+    return merged;
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return mergeDefaults(parsed, DEFAULT_STATE);
+    } catch (e) {
+      console.error("Failed to load state, starting fresh.", e);
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+  }
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { console.error("Failed to save state", e); }
+  }
+
+  var state = loadState();
+  // Migrate any pre-existing structured resources (title/url) into the new freeform notes field.
+  state.categories.forEach(function (cat) {
+    (cat.subcategories || []).forEach(function (sub) {
+      if (sub.notes === undefined) sub.notes = "";
+      if (Array.isArray(sub.resources) && sub.resources.length > 0) {
+        var lines = sub.resources.map(function (r) { return r.url ? r.title + ": " + r.url : r.title; });
+        sub.notes = (sub.notes ? sub.notes + "\n" : "") + lines.join("\n");
+      }
+      delete sub.resources;
+    });
+    delete cat.enabled;
+  });
+  // One-time backfill: add the movement reminder for people with existing saved state,
+  // without re-adding it if the person later deletes it on purpose.
+  if (!state.meta.wellnessDefaultsAddedV1) {
+    var existingReminderIds = state.reminders.map(function (r) { return r.id; });
+    if (existingReminderIds.indexOf("rem_move") === -1) {
+      state.reminders.push({ id: "rem_move", label: "Stand up and move", minutes: 60, enabled: true, lastFiredTs: Date.now(), isDefault: true });
+    }
+    state.meta.wellnessDefaultsAddedV1 = true;
+  }
+  // Ergonomics content moved out of Reminders/Break Ideas into the Timer tab's tip of the day —
+  // remove it once for anyone who got it added by the previous version, without touching anything else they've edited.
+  if (!state.meta.ergonomicsMovedToTipV1) {
+    state.reminders = state.reminders.filter(function (r) { return r.id !== "rem_ergonomics"; });
+    state.categories = state.categories.filter(function (c) { return c.id !== "ergonomics"; });
+    state.meta.ergonomicsMovedToTipV1 = true;
+  }
+  // Bring the default posture-check interval down to 10 minutes for anyone who already has it saved at the old value.
+  if (!state.meta.postureIntervalV1) {
+    state.reminders.forEach(function (r) { if (r.id === "rem_posture_check") r.minutes = 10; });
+    state.meta.postureIntervalV1 = true;
+  }
+  // Add default Break ToDos once, without re-adding them if the person later deletes them on purpose.
+  if (!state.meta.defaultChoresAddedV1) {
+    var existingTodoIds = state.todos.map(function (t) { return t.id; });
+    if (existingTodoIds.indexOf("todo_laundry") === -1) state.todos.push({ id: "todo_laundry", text: "Laundry", done: false });
+    if (existingTodoIds.indexOf("todo_vacuum") === -1) state.todos.push({ id: "todo_vacuum", text: "Vacuum", done: false });
+    state.meta.defaultChoresAddedV1 = true;
+  }
+  // Ensure every reminder has a start point so countdowns work from first load, independent of the pomodoro timer.
+  state.reminders.forEach(function (r) { if (!r.lastFiredTs) r.lastFiredTs = Date.now(); });
+  saveState();
+
+  function phaseTotalSec(phase) {
+    if (phase === "work") return state.settings.workMinutes * 60;
+    if (phase === "longBreak") return state.settings.longBreakMinutes * 60;
+    return state.settings.breakMinutes * 60;
+  }
+  function resetRemainingForPhase(phase) {
+    state.timer.remainingSec = phaseTotalSec(phase);
+    state.timer.totalSec = state.timer.remainingSec;
+  }
+  function startPhaseCountdown() { state.timer.phaseEndTs = Date.now() + state.timer.remainingSec * 1000; }
+  function freezeRemaining() {
+    if (state.timer.phaseEndTs) state.timer.remainingSec = Math.max(0, Math.round((state.timer.phaseEndTs - Date.now()) / 1000));
+    state.timer.phaseEndTs = null;
+  }
+  function phaseMeta(phase) {
+    if (phase === "work") return { label: "Work", colorVar: "--work", dimVar: "--work-dim" };
+    if (phase === "longBreak") return { label: "Long break", colorVar: "--longbreak", dimVar: "--longbreak-dim" };
+    return { label: "Short break", colorVar: "--break", dimVar: "--break-dim" };
+  }
+
+  // ---------- Alerts: in-app toast (always works) + optional sound + best-effort OS notification ----------
+  var audioCtx = null;
+  function unlockAudio() {
+    if (audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* unsupported */ }
+  }
+  function playBeep() {
+    if (!state.settings.soundEnabled || !audioCtx) return;
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = 660;
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.42);
+    } catch (e) { /* no-op */ }
+  }
+  function showToast(title, message, colorVar) {
+    var container = document.getElementById("toastContainer");
+    var card = document.createElement("div");
+    card.className = "toast-card";
+    card.style.borderLeftColor = "var(" + (colorVar || "--work") + ")";
+    var t = document.createElement("div"); t.className = "toast-title"; t.textContent = title;
+    var b = document.createElement("div"); b.className = "toast-body"; b.textContent = message;
+    card.appendChild(t); card.appendChild(b);
+    container.appendChild(card);
+    setTimeout(function () {
+      card.style.opacity = "0";
+      setTimeout(function () { card.remove(); }, 300);
+    }, 6000);
+  }
+  function notify(title, message, colorVar) {
+    showToast(title, message, colorVar);
+    playBeep();
+    if ("Notification" in window && Notification.permission === "granted") {
+      try { new Notification(title, { body: message }); } catch (e) { /* mobile browsers commonly block this; toast already shown */ }
+    }
+  }
+
+  function chooseBreakSuggestion() {
+    var items = [];
+    state.categories.forEach(function (category) {
+      (category.subcategories || []).forEach(function (sub) {
+        items.push({ label: category.name + " / " + sub.name, notes: sub.notes || "" });
+      });
+    });
+    state.todos.filter(function (t) { return !t.done; }).forEach(function (t) { items.push({ label: "TODO: " + t.text, notes: "" }); });
+    if (items.length === 0) return null;
+    return items[Math.floor(Math.random() * items.length)];
+  }
+  function autolinkify(text) {
+    return escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, function (url) { return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>'; });
+  }
+  function renderSuggestionInto(elId, suggestion, fallbackText) {
+    var el = document.getElementById(elId);
+    if (!suggestion) {
+      if (fallbackText) { el.textContent = fallbackText; el.classList.add("visible"); } else { el.classList.remove("visible"); }
+      return;
+    }
+    var html = escapeHtml(suggestion.label);
+    if (suggestion.notes && suggestion.notes.trim()) {
+      html += '<div style="margin-top:6px;color:var(--text-dim);font-size:12px;white-space:pre-wrap;">' + autolinkify(suggestion.notes.trim()) + '</div>';
+    }
+    el.innerHTML = html;
+    el.classList.add("visible");
+  }
+
+  function onPhaseCompleted() {
+    if (state.timer.phase === "work") {
+      state.timer.cycleCount += 1;
+      var isLongBreak = state.timer.cycleCount % state.settings.longBreakEvery === 0;
+      state.timer.phase = isLongBreak ? "longBreak" : "break";
+      resetRemainingForPhase(state.timer.phase);
+      notify("Work session done", "Time for a " + (isLongBreak ? "long" : "short") + " break.", isLongBreak ? "--longbreak" : "--break");
+      fireBreakSyncedReminders();
+      if (state.settings.showBreakSuggestion) {
+        var suggestion = chooseBreakSuggestion();
+        renderSuggestionInto("suggestionToast", suggestion);
+        if (suggestion) notify("Break idea", suggestion.label, "--break");
+      }
+    } else {
+      state.timer.phase = "work";
+      resetRemainingForPhase("work");
+      notify("Break complete", "Back to focus time.", "--work");
+      renderSuggestionInto("suggestionToast", null);
+    }
+    if (!state.settings.autoStartNextSession) state.timer.isRunning = false;
+    if (state.timer.isRunning) startPhaseCountdown(); else state.timer.phaseEndTs = null;
+  }
+
+  function fireBreakSyncedReminders() {
+    if (!state.settings.remindersEnabled) return;
+    var now = Date.now();
+    state.reminders.forEach(function (r) {
+      if (!r.enabled || !r.syncWithBreak) return;
+      notify("Reminder", r.label, "--longbreak");
+      r.lastFiredTs = now;
+    });
+  }
+
+  function formatCountdown(ms) {
+    if (ms <= 0) return "due";
+    var totalSec = Math.ceil(ms / 1000);
+    if (totalSec < 60) return "in " + totalSec + "s";
+    return "in " + Math.ceil(totalSec / 60) + "m";
+  }
+  function checkReminders() {
+    if (!state.settings.remindersEnabled) return;
+    var now = Date.now();
+    state.reminders.forEach(function (r) {
+      if (!r.enabled || r.syncWithBreak) return;
+      var intervalMs = Math.max(1, Number(r.minutes) || 1) * 60000;
+      if (now - r.lastFiredTs >= intervalMs) {
+        notify("Reminder", r.label, "--longbreak");
+        r.lastFiredTs = now;
+      }
+    });
+  }
+  function updateReminderCountdowns() {
+    var now = Date.now();
+    state.reminders.forEach(function (r) {
+      var el = document.getElementById("remain-" + r.id);
+      if (!el) return;
+      if (!state.settings.remindersEnabled || !r.enabled) { el.textContent = "off"; return; }
+      if (r.syncWithBreak) { el.textContent = "at next break"; return; }
+      var intervalMs = Math.max(1, Number(r.minutes) || 1) * 60000;
+      el.textContent = formatCountdown(intervalMs - (now - r.lastFiredTs));
+    });
+  }
+
+  function tick() {
+    if (state.timer.isRunning) {
+      if (state.timer.phaseEndTs) {
+        state.timer.remainingSec = Math.max(0, Math.round((state.timer.phaseEndTs - Date.now()) / 1000));
+      } else {
+        state.timer.remainingSec = Math.max(0, state.timer.remainingSec - 1);
+      }
+      if (state.timer.remainingSec <= 0) onPhaseCompleted();
+    }
+    checkReminders();
+    updateReminderCountdowns();
+    saveState();
+    renderTimer();
+    updateTitle();
+  }
+  function updateTitle() {
+    var meta = phaseMeta(state.timer.phase);
+    document.title = (state.timer.isRunning ? formatMMSS(state.timer.remainingSec) + " · " : "") + meta.label + " — Pomodoro Buddy";
+  }
+  setInterval(tick, 1000);
+
+  // ---------- Dial rendering (progress ring only — no drag) ----------
+  var dialSvg = document.getElementById("dialSvg");
+  var CX = 130, CY = 130, R_TRACK = 110, R_TICK_OUT = 122, R_TICK_IN = 112;
+
+  function buildDialStatic() {
+    var ns = "http://www.w3.org/2000/svg";
+    while (dialSvg.firstChild) dialSvg.removeChild(dialSvg.firstChild);
+
+    var track = document.createElementNS(ns, "circle");
+    track.setAttribute("cx", CX); track.setAttribute("cy", CY); track.setAttribute("r", R_TRACK);
+    track.setAttribute("fill", "none"); track.setAttribute("stroke", "var(--border)"); track.setAttribute("stroke-width", "10");
+    dialSvg.appendChild(track);
+
+    for (var i = 0; i < 48; i++) {
+      var angle = (i / 48) * TWO_PI - Math.PI / 2;
+      var x1 = CX + R_TICK_IN * Math.cos(angle), y1 = CY + R_TICK_IN * Math.sin(angle);
+      var x2 = CX + R_TICK_OUT * Math.cos(angle), y2 = CY + R_TICK_OUT * Math.sin(angle);
+      var tickEl = document.createElementNS(ns, "line");
+      tickEl.setAttribute("x1", x1); tickEl.setAttribute("y1", y1); tickEl.setAttribute("x2", x2); tickEl.setAttribute("y2", y2);
+      tickEl.setAttribute("stroke", "var(--border)"); tickEl.setAttribute("stroke-width", i % 4 === 0 ? "2" : "1");
+      dialSvg.appendChild(tickEl);
+    }
+
+    var progress = document.createElementNS(ns, "circle");
+    progress.setAttribute("id", "dialProgress");
+    progress.setAttribute("cx", CX); progress.setAttribute("cy", CY); progress.setAttribute("r", R_TRACK);
+    progress.setAttribute("fill", "none"); progress.setAttribute("stroke", "var(--work)"); progress.setAttribute("stroke-width", "10");
+    progress.setAttribute("stroke-linecap", "round");
+    progress.setAttribute("transform", "rotate(-90 " + CX + " " + CY + ")");
+    progress.setAttribute("stroke-dasharray", (TWO_PI * R_TRACK).toFixed(2));
+    dialSvg.appendChild(progress);
+  }
+  buildDialStatic();
+
+  function renderTimer() {
+    var meta = phaseMeta(state.timer.phase);
+    document.getElementById("brandDot").style.setProperty("background", "var(" + meta.colorVar + ")");
+    document.documentElement.style.setProperty("--phase-color", "var(" + meta.colorVar + ")");
+    document.documentElement.style.setProperty("--phase-dim", "var(" + meta.dimVar + ")");
+
+    var pill = document.getElementById("phasePill");
+    pill.textContent = meta.label;
+    pill.style.background = "var(" + meta.dimVar + ")";
+    pill.style.color = "var(" + meta.colorVar + ")";
+
+    document.getElementById("dialTime").textContent = formatMMSS(state.timer.remainingSec);
+    document.getElementById("dialTime").classList.toggle("editable", !state.timer.isRunning);
+    document.getElementById("dialHint").textContent = state.timer.isRunning
+      ? (state.timer.phase === "work" ? "focusing" : "on break")
+      : "tap time to edit · tap start";
+
+    document.getElementById("cycleCount").innerHTML =
+      "Cycle <b>" + state.timer.cycleCount + "</b> · long break every <b>" + state.settings.longBreakEvery + "</b>";
+
+    var total = state.timer.totalSec || phaseTotalSec(state.timer.phase);
+    var frac = total > 0 ? Math.max(0, Math.min(1, state.timer.remainingSec / total)) : 0;
+    var circumference = TWO_PI * R_TRACK;
+    var progress = document.getElementById("dialProgress");
+    var resolvedColor = getComputedStyle(document.documentElement).getPropertyValue("--phase-color").trim();
+    progress.setAttribute("stroke", resolvedColor || "var(--work)");
+    progress.setAttribute("stroke-dashoffset", (circumference * (1 - frac)).toFixed(2));
+
+    document.getElementById("startPauseBtn").textContent = state.timer.isRunning ? "Pause" : "Start";
+
+    var banner = document.getElementById("notifyBanner");
+    if (!("Notification" in window)) {
+      banner.style.display = "flex";
+      banner.innerHTML = '<span>Your browser doesn\u2019t support OS notifications here. In-app alerts and sound above still work.</span>';
+    } else if (Notification.permission === "denied") {
+      banner.style.display = "flex";
+      banner.innerHTML = '<span>OS notifications are blocked for this page in your browser settings. In-app alerts and sound still work regardless.</span>';
+    } else if (Notification.permission === "default") {
+      banner.style.display = "flex";
+      banner.innerHTML = '<span>Enable OS notifications for phase changes to reach you in other tabs too (in-app alerts always work as a fallback).</span><button class="btn btn-ghost btn-sm" id="enableNotifyBtn">Enable</button>';
+      document.getElementById("enableNotifyBtn").addEventListener("click", function () {
+        Notification.requestPermission().then(function () { renderTimer(); });
+      });
+    } else {
+      banner.style.display = "none";
+    }
+  }
+
+  // ---------- Editable time ----------
+  var dialTimeEl = document.getElementById("dialTime");
+  var dialTimeInput = document.getElementById("dialTimeInput");
+  function parseTimeInput(str) {
+    str = str.trim();
+    var m = str.match(/^(\d{1,3}):([0-5]?\d)$/);
+    var totalSec;
+    if (m) { totalSec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10); }
+    else if (/^\d{1,4}$/.test(str)) { totalSec = parseInt(str, 10) * 60; }
+    else { return null; }
+    return Math.max(5, Math.min(999 * 60, totalSec));
+  }
+  function startEditingTime() {
+    if (state.timer.isRunning) return;
+    dialTimeInput.value = formatMMSS(state.timer.remainingSec);
+    dialTimeEl.style.display = "none";
+    dialTimeInput.style.display = "inline-block";
+    dialTimeInput.focus();
+    dialTimeInput.select();
+  }
+  function commitEditingTime() {
+    var sec = parseTimeInput(dialTimeInput.value);
+    if (sec !== null) { state.timer.remainingSec = sec; state.timer.totalSec = sec; saveState(); }
+    dialTimeInput.style.display = "none";
+    dialTimeEl.style.display = "";
+    renderTimer();
+  }
+  dialTimeEl.addEventListener("click", startEditingTime);
+  dialTimeInput.addEventListener("blur", commitEditingTime);
+  dialTimeInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") dialTimeInput.blur();
+    else if (e.key === "Escape") { dialTimeInput.value = formatMMSS(state.timer.remainingSec); dialTimeInput.blur(); }
+  });
+
+  // ---------- Controls ----------
+  document.getElementById("startPauseBtn").addEventListener("click", function () {
+    unlockAudio();
+    if (state.timer.isRunning) { freezeRemaining(); state.timer.isRunning = false; }
+    else { state.timer.isRunning = true; startPhaseCountdown(); }
+    saveState();
+    renderTimer();
+  });
+  document.getElementById("skipBtn").addEventListener("click", function () { onPhaseCompleted(); saveState(); renderTimer(); });
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    state.timer.isRunning = false;
+    state.timer.phase = "work";
+    state.timer.cycleCount = 0;
+    resetRemainingForPhase("work");
+    state.timer.phaseEndTs = null;
+    renderSuggestionInto("suggestionToast", null);
+    saveState();
+    renderTimer();
+  });
+
+  // ---------- Tabs ----------
+  var tabs = document.querySelectorAll(".nav button.tab");
+  tabs.forEach(function (btn) {
+    btn.addEventListener("click", function () { state.ui.activeTab = btn.getAttribute("data-tab"); saveState(); renderTabs(); });
+  });
+  function renderTabs() {
+    tabs.forEach(function (btn) { btn.classList.toggle("active", btn.getAttribute("data-tab") === state.ui.activeTab); });
+    document.querySelectorAll(".panel").forEach(function (p) { p.classList.toggle("active", p.id === "panel-" + state.ui.activeTab); });
+  }
+
+  // ---------- Theme ----------
+  function applyTheme() {
+    document.documentElement.setAttribute("data-theme", state.settings.darkMode ? "dark" : "light");
+    document.getElementById("themeLabel").textContent = state.settings.darkMode ? "Dark" : "Light";
+    renderTimer();
+  }
+  document.getElementById("themeToggle").addEventListener("click", function () { state.settings.darkMode = !state.settings.darkMode; saveState(); applyTheme(); });
+
+  // ---------- Todos ----------
+  function renderTodos() {
+    var list = document.getElementById("todoList");
+    list.innerHTML = "";
+    if (state.todos.length === 0) { list.innerHTML = '<div class="empty">No todos yet. Add one for your next break.</div>'; return; }
+    // Open tasks first, done tasks sink to the bottom; stable within each group.
+    var sorted = state.todos.slice().sort(function (a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); });
+    sorted.forEach(function (todo) {
+      var row = document.createElement("div");
+      row.className = "row" + (todo.done ? " done" : "");
+      row.innerHTML = '<input type="checkbox" ' + (todo.done ? "checked" : "") + '><span class="row-label"></span><button class="icon-btn" title="Delete">\u2715</button>';
+      row.querySelector(".row-label").textContent = todo.text;
+      row.querySelector('input[type="checkbox"]').addEventListener("change", function () { todo.done = !todo.done; saveState(); renderTodos(); });
+      row.querySelector(".icon-btn").addEventListener("click", function () { state.todos = state.todos.filter(function (t) { return t.id !== todo.id; }); saveState(); renderTodos(); });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById("addTodoBtn").addEventListener("click", addTodo);
+  document.getElementById("newTodoInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addTodo(); });
+  function addTodo() {
+    var input = document.getElementById("newTodoInput");
+    var text = input.value.trim();
+    if (!text) return;
+    state.todos.push({ id: generateId("todo"), text: text, done: false });
+    input.value = ""; saveState(); renderTodos();
+  }
+
+  // ---------- Categories / break ideas ----------
+  var draggedCatId = null;
+  var expandedCategories = new Set();
+  function renderCategories() {
+    var list = document.getElementById("categoryList");
+    list.innerHTML = "";
+    state.categories.forEach(function (cat) {
+      var card = document.createElement("div");
+      card.className = "category-card" + (expandedCategories.has(cat.id) ? " expanded" : "");
+      card.draggable = true;
+
+      card.addEventListener("dragstart", function (e) {
+        draggedCatId = cat.id;
+        card.classList.add("dragging");
+        try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", cat.id); } catch (err) { /* no-op */ }
+      });
+      card.addEventListener("dragend", function () { card.classList.remove("dragging"); draggedCatId = null; });
+      card.addEventListener("dragover", function (e) { e.preventDefault(); card.classList.add("drag-over"); });
+      card.addEventListener("dragleave", function () { card.classList.remove("drag-over"); });
+      card.addEventListener("drop", function (e) {
+        e.preventDefault();
+        card.classList.remove("drag-over");
+        if (!draggedCatId || draggedCatId === cat.id) return;
+        var fromIdx = state.categories.findIndex(function (c) { return c.id === draggedCatId; });
+        var toIdx = state.categories.findIndex(function (c) { return c.id === cat.id; });
+        if (fromIdx === -1 || toIdx === -1) return;
+        var moved = state.categories.splice(fromIdx, 1)[0];
+        state.categories.splice(toIdx, 0, moved);
+        saveState();
+        renderCategories();
+      });
+
+      var head = document.createElement("div");
+      head.className = "category-head";
+      head.innerHTML = '<span class="drag-handle" title="Drag to reorder">\u2261</span><span class="cat-icon"></span><span class="row-label"></span><span class="chevron">\u2304</span><button class="icon-btn" title="Delete category">\u2715</button>';
+      head.querySelector(".cat-icon").textContent = CATEGORY_ICONS[cat.id] || "\u2726";
+      head.addEventListener("click", function (e) {
+        if (e.target.closest('button, .drag-handle')) return;
+        if (expandedCategories.has(cat.id)) expandedCategories.delete(cat.id); else expandedCategories.add(cat.id);
+        renderCategories();
+      });
+      head.querySelector(".row-label").textContent = cat.name;
+      head.querySelector(".icon-btn").addEventListener("click", function () { state.categories = state.categories.filter(function (c) { return c.id !== cat.id; }); saveState(); renderCategories(); });
+      card.appendChild(head);
+
+      var body = document.createElement("div");
+      body.className = "category-body";
+      (cat.subcategories || []).forEach(function (sub) {
+        var subRow = document.createElement("div");
+        subRow.className = "sub-row";
+        var hasNotes = !!(sub.notes && sub.notes.trim());
+        subRow.innerHTML =
+          '<span class="row-label"></span>' +
+          '<button class="info-btn' + (hasNotes ? ' has-content' : '') + '" title="' + (hasNotes ? "View/edit notes" : "Add notes or a link") + '">\uD83D\uDCDD</button>' +
+          '<button class="icon-btn" title="Delete subcategory">\u2715</button>';
+        subRow.querySelector(".row-label").textContent = sub.name;
+        subRow.querySelector(".info-btn").addEventListener("click", function () { openSubNotesModal(cat, sub); });
+        subRow.querySelector(".icon-btn").addEventListener("click", function () { cat.subcategories = cat.subcategories.filter(function (s) { return s.id !== sub.id; }); saveState(); renderCategories(); });
+        body.appendChild(subRow);
+      });
+      var addSub = document.createElement("div");
+      addSub.className = "mini-add";
+      addSub.innerHTML = '<input type="text" placeholder="New subcategory"><button class="btn btn-ghost btn-sm">Add</button>';
+      var addSubInput = addSub.querySelector("input");
+      addSub.querySelector("button").addEventListener("click", function () {
+        var name = addSubInput.value.trim();
+        if (!name) return;
+        cat.subcategories = (cat.subcategories || []).concat([{ id: generateId("sub"), name: name, notes: "" }]);
+        addSubInput.value = ""; saveState(); renderCategories();
+      });
+      body.appendChild(addSub);
+      card.appendChild(body);
+      list.appendChild(card);
+    });
+  }
+  document.getElementById("addCategoryBtn").addEventListener("click", addCategory);
+  document.getElementById("newCategoryInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addCategory(); });
+  function addCategory() {
+    var input = document.getElementById("newCategoryInput");
+    var name = input.value.trim();
+    if (!name) return;
+    state.categories.push({ id: generateId("cat"), name: name, isDefault: false, subcategories: [] });
+    input.value = ""; saveState(); renderCategories();
+  }
+  document.getElementById("surpriseBtn").addEventListener("click", function () {
+    var s = chooseBreakSuggestion();
+    renderSuggestionInto("breakSuggestionToast", s, "Add a category or a todo first.");
+  });
+
+  // ---------- Subcategory notes modal ----------
+  var modalOverlay = document.getElementById("modalOverlay");
+  var modalTitle = document.getElementById("modalTitle");
+  var modalTextarea = document.getElementById("modalTextarea");
+  var modalTargetCatId = null, modalTargetSubId = null;
+
+  function openSubNotesModal(cat, sub) {
+    modalTargetCatId = cat.id;
+    modalTargetSubId = sub.id;
+    modalTitle.textContent = cat.name + " / " + sub.name;
+    modalTextarea.value = sub.notes || "";
+    modalOverlay.classList.add("visible");
+    modalTextarea.focus();
+  }
+  function closeModal() {
+    modalOverlay.classList.remove("visible");
+    modalTargetCatId = null;
+    modalTargetSubId = null;
+  }
+  function saveModal() {
+    if (!modalTargetCatId) return;
+    var cat = state.categories.find(function (c) { return c.id === modalTargetCatId; });
+    if (!cat) return;
+    var sub = (cat.subcategories || []).find(function (s) { return s.id === modalTargetSubId; });
+    if (!sub) return;
+    sub.notes = modalTextarea.value;
+    saveState();
+    closeModal();
+    renderCategories();
+  }
+  document.getElementById("modalClose").addEventListener("click", closeModal);
+  document.getElementById("modalSave").addEventListener("click", saveModal);
+  modalOverlay.addEventListener("click", function (e) { if (e.target === modalOverlay) closeModal(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && modalOverlay.classList.contains("visible")) closeModal();
+  });
+
+  // ---------- Reminders ----------
+  function renderReminders() {
+    var list = document.getElementById("reminderList");
+    list.innerHTML = "";
+    if (state.reminders.length === 0) { list.innerHTML = '<div class="empty">No reminders set.</div>'; return; }
+    state.reminders.forEach(function (rem) {
+      var row = document.createElement("div");
+      row.className = "row reminder-row";
+      row.innerHTML =
+        '<span class="row-label"></span>' +
+        '<span class="reminder-countdown" id="remain-' + rem.id + '">\u2014</span>' +
+        '<input type="number" class="reminder-minutes" min="1" value="' + rem.minutes + '"' + (rem.syncWithBreak ? " disabled" : "") + '> min' +
+        '<button class="sync-btn' + (rem.syncWithBreak ? " active" : "") + '" title="Fire this at the end of every work session instead of on its own interval">\u2615 Sync with break</button>' +
+        '<button class="btn btn-ghost btn-sm">Done</button>' +
+        '<label class="reminder-toggle"><input type="checkbox" ' + (rem.enabled ? "checked" : "") + '><span class="switch-track"></span></label>' +
+        '<button class="icon-btn" title="Delete">\u2715</button>';
+      row.querySelector(".row-label").textContent = rem.label;
+      row.querySelector(".reminder-minutes").addEventListener("change", function (e) {
+        rem.minutes = Math.max(1, Number(e.target.value) || 1);
+        rem.lastFiredTs = Date.now();
+        saveState(); updateReminderCountdowns();
+      });
+      row.querySelector(".sync-btn").addEventListener("click", function () {
+        rem.syncWithBreak = !rem.syncWithBreak;
+        rem.lastFiredTs = Date.now();
+        saveState(); renderReminders();
+      });
+      row.querySelector(".btn-ghost").addEventListener("click", function () { rem.lastFiredTs = Date.now(); saveState(); updateReminderCountdowns(); });
+      row.querySelector('input[type="checkbox"]').addEventListener("change", function () {
+        rem.enabled = !rem.enabled; rem.lastFiredTs = Date.now(); saveState(); updateReminderCountdowns();
+      });
+      row.querySelector(".icon-btn").addEventListener("click", function () { state.reminders = state.reminders.filter(function (r) { return r.id !== rem.id; }); saveState(); renderReminders(); });
+      list.appendChild(row);
+    });
+    updateReminderCountdowns();
+    syncReminderMasterUI();
+  }
+  function setRemindersEnabled(enabled) {
+    state.settings.remindersEnabled = enabled;
+    if (enabled) {
+      var now = Date.now();
+      state.reminders.forEach(function (r) { r.lastFiredTs = now; });
+    }
+    saveState();
+    syncReminderMasterUI();
+    updateReminderCountdowns();
+  }
+  function syncReminderMasterUI() {
+    document.getElementById("masterReminderToggle").checked = state.settings.remindersEnabled;
+    document.getElementById("navReminderToggle").checked = state.settings.remindersEnabled;
+    document.getElementById("reminderList").classList.toggle("muted", !state.settings.remindersEnabled);
+  }
+  document.getElementById("masterReminderToggle").addEventListener("change", function (e) { setRemindersEnabled(e.target.checked); });
+  document.getElementById("navReminderToggle").addEventListener("change", function (e) { setRemindersEnabled(e.target.checked); });
+  document.getElementById("addReminderBtn").addEventListener("click", addReminder);
+  document.getElementById("newReminderInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addReminder(); });
+  function addReminder() {
+    var input = document.getElementById("newReminderInput");
+    var label = input.value.trim();
+    if (!label) return;
+    state.reminders.push({ id: generateId("rem"), label: label, minutes: 30, enabled: true, lastFiredTs: Date.now(), syncWithBreak: false, isDefault: false });
+    input.value = ""; saveState(); renderReminders();
+  }
+
+  // ---------- Settings (+ quick settings on Timer tab, kept in sync) ----------
+  function renderDurationFields() {
+    document.getElementById("quickWork").value = state.settings.workMinutes;
+    document.getElementById("quickBreak").value = state.settings.breakMinutes;
+    document.getElementById("quickLongBreak").value = state.settings.longBreakMinutes;
+    document.getElementById("quickLongEvery").value = state.settings.longBreakEvery;
+  }
+  function bindDurationSetting(id, key, fallback) {
+    document.getElementById(id).addEventListener("change", function (e) {
+      state.settings[key] = Math.max(1, Number(e.target.value) || fallback);
+      renderDurationFields();
+      if (!state.timer.isRunning) resetRemainingForPhase(state.timer.phase);
+      saveState();
+      renderTimer();
+    });
+  }
+  bindDurationSetting("quickWork", "workMinutes", 25);
+  bindDurationSetting("quickBreak", "breakMinutes", 5);
+  bindDurationSetting("quickLongBreak", "longBreakMinutes", 15);
+  bindDurationSetting("quickLongEvery", "longBreakEvery", 4);
+
+  function renderSettings() {
+    renderDurationFields();
+    document.getElementById("setAutoStart").checked = state.settings.autoStartNextSession;
+    document.getElementById("setShowSuggestion").checked = state.settings.showBreakSuggestion;
+    document.getElementById("setSoundEnabled").checked = state.settings.soundEnabled;
+  }
+  document.getElementById("setAutoStart").addEventListener("change", function (e) { state.settings.autoStartNextSession = e.target.checked; saveState(); });
+  document.getElementById("setShowSuggestion").addEventListener("change", function (e) { state.settings.showBreakSuggestion = e.target.checked; saveState(); });
+  document.getElementById("setSoundEnabled").addEventListener("change", function (e) { state.settings.soundEnabled = e.target.checked; saveState(); });
+
+  // ---------- Backup: export/import ----------
+  // Plain JSON, no browser-specific storage format involved, so a file exported from one browser
+  // imports cleanly in any other (Chrome, Firefox, Safari, mobile browsers, etc.).
+  function exportBackup() {
+    var payload = { app: "pomodoro-buddy", schemaVersion: 1, exportedAt: new Date().toISOString(), data: state };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "pomodoro-buddy-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function refreshEverything() {
+    applyTheme();
+    renderTabs();
+    renderTimer();
+    renderTodos();
+    renderCategories();
+    renderReminders();
+    renderSettings();
+    renderTipOfDay();
+    updateTitle();
+  }
+  function handleImportFile(file) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var incoming;
+      try {
+        var parsed = JSON.parse(e.target.result);
+        incoming = (parsed && parsed.data && typeof parsed.data === "object") ? parsed.data : parsed;
+        if (!incoming || typeof incoming !== "object" || !incoming.settings) {
+          throw new Error("This doesn't look like a Pomodoro Buddy backup file.");
+        }
+      } catch (err) {
+        alert("Couldn't import that file: " + (err && err.message ? err.message : "invalid file."));
+        return;
+      }
+      if (!confirm("Importing will replace everything currently saved in this browser \u2014 timer, reminders, break ideas, todos, and settings. Continue?")) return;
+      state = mergeDefaults(incoming, DEFAULT_STATE);
+      saveState();
+      refreshEverything();
+      showToast("Backup imported", "Data from the file is now active in this browser.", "--work");
+    };
+    reader.onerror = function () { alert("Couldn't read that file."); };
+    reader.readAsText(file);
+  }
+  document.getElementById("exportBackupBtn").addEventListener("click", exportBackup);
+  document.getElementById("importBackupBtn").addEventListener("click", function () { document.getElementById("importBackupInput").click(); });
+  document.getElementById("importBackupInput").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (file) handleImportFile(file);
+    e.target.value = "";
+  });
+
+  // ---------- Init ----------
+  applyTheme();
+  renderTabs();
+  renderTimer();
+  renderTodos();
+  renderCategories();
+  renderReminders();
+  renderSettings();
+  renderTipOfDay();
+  updateTitle();
+
+  window.addEventListener("beforeunload", function () { if (state.timer.isRunning) freezeRemaining(); saveState(); });
+})();
+</script>
+</body>
+</html>
